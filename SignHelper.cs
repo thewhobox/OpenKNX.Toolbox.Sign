@@ -173,7 +173,7 @@ namespace OpenKNX.Toolbox.Sign
                 string name = Path.GetFileName(file);
                 if (!name.Contains('\\')) continue;
                 string dest = Path.Combine(manuDir, name.Replace('\\', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                _ = Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 File.Move(file, dest, overwrite: true);
             }
         }
