@@ -20,17 +20,17 @@ namespace OpenKNX.Toolbox.Sign
             Application
         }
         
-        public static async Task ExportKnxprodAsync(string iWorkingDir, string iKnxprodFileName, string lTempXmlFileName, string iXsdFileName, bool iIsDebug, bool iAutoXsd, string iBaggagesDirName = "", CancellationToken token = default)
+        public static async Task ExportKnxprodAsync(string iWorkingDir, string iKnxprodFileName, string lTempXmlFileName, string iXsdFileName, bool iIsDebug, bool iAutoXsd, string iBaggagesDirName = "", CancellationToken token = default, string translationsPath = "")
         {
             Task runner = Task.Run(() => {
-                ExportKnxprod(iWorkingDir, iKnxprodFileName, lTempXmlFileName, iXsdFileName, iIsDebug, iAutoXsd, iBaggagesDirName);
+                ExportKnxprod(iWorkingDir, iKnxprodFileName, lTempXmlFileName, iXsdFileName, iIsDebug, iAutoXsd, iBaggagesDirName, translationsPath);
             }, token);
             await runner;
             if(runner.Exception != null)
                 throw runner.Exception;
         }
 
-        public static void ExportKnxprod(string iWorkingDir, string iKnxprodFileName, string lTempXmlFileName, string iXsdFileName, bool iIsDebug, bool iAutoXsd, string iBaggagesDirName)
+        public static void ExportKnxprod(string iWorkingDir, string iKnxprodFileName, string lTempXmlFileName, string iXsdFileName, bool iIsDebug, bool iAutoXsd, string iBaggagesDirName, string translationsPath = "")
         {
             string outputFolder = AppDomain.CurrentDomain.BaseDirectory;
             if(Directory.Exists(Path.Combine(outputFolder, "Storage")))
@@ -51,7 +51,32 @@ namespace OpenKNX.Toolbox.Sign
             Directory.CreateDirectory(outputFolder);
             Directory.CreateDirectory(Path.Combine(outputFolder, manuId));
 
-            SplitXml(lTempXmlFileName, outputFolder);
+            // Inject translations if available (operates on a temp copy, never modifies original)
+            string xmlToProcess = lTempXmlFileName;
+            string? translatedTempFile = null;
+            if (!string.IsNullOrEmpty(translationsPath))
+            {
+                var translations = TranslationHelper.LoadTranslations(translationsPath);
+                if (translations.Count > 0)
+                {
+                    string xmlContent = File.ReadAllText(lTempXmlFileName);
+                    XDocument xdoc = XDocument.Parse(xmlContent);
+                    TranslationHelper.InjectTranslations(xdoc, translations);
+                    translatedTempFile = Path.GetTempFileName();
+                    xdoc.Save(translatedTempFile);
+                    xmlToProcess = translatedTempFile;
+                }
+            }
+
+            try
+            {
+                SplitXml(xmlToProcess, outputFolder);
+            }
+            finally
+            {
+                if (translatedTempFile != null && File.Exists(translatedTempFile))
+                    File.Delete(translatedTempFile);
+            }
 
             string iBaggageName = Path.GetFileName(iBaggagesDirName);
             string[] baggageDirs = Directory.GetDirectories(iWorkingDir, "*.baggages");
